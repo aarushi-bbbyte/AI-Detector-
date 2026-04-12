@@ -14,13 +14,14 @@ A full-stack document analysis tool with two modes: **AI Content Detection** (is
 - **Chunked inference** — documents split into 512-char chunks, scored individually, then averaged
 - **Confidence scoring** — `confidence = |score − 0.5| × 2` with high / medium / low certainty labels
 - Per-chunk score bar chart in the results view
+- **⬇ Download PDF report** — export a full dark-themed report including score, confidence, chunk chart, and document preview
 
 ### 📄 Plagiarism Check
 - Compare **two documents** against each other for copied content
 - Upload PDF, DOCX, or TXT for either document, or paste text directly
 - **Sentence-level matching** — Jaccard trigram similarity finds near-identical passages
 - **TF-IDF cosine similarity** — overall document-level vocabulary overlap score
-- **Colour-coded highlights** — matching passages highlighted in both documents simultaneously, hover a match to locate it
+- **Colour-coded highlights** — matching passages highlighted in both documents simultaneously; hover a match to locate it
 - Overall similarity %, sentence coverage %, and match count
 - Verdict: High plagiarism / Significant overlap / Some similarity / Minor / Original
 
@@ -78,6 +79,7 @@ Browser (React + Vite)
 │   ├── src/
 │   │   ├── App.jsx                # Main app — tab switcher, AI detection flow, history sidebar
 │   │   ├── PlagiarismChecker.jsx  # Plagiarism tab — two-doc upload, highlights, match list
+│   │   ├── reportGenerator.js     # Client-side PDF report generation (jsPDF)
 │   │   ├── App.css                # Styles
 │   │   └── main.jsx               # Entry point
 │   ├── .env.example
@@ -211,7 +213,7 @@ npm run dev
 3. Pairs above 0.5 similarity threshold flagged as matches (greedy, no double-matching)
 4. **TF-IDF cosine similarity** computed at document level for vocabulary overlap
 5. Final similarity % = blend of sentence coverage + cosine similarity
-6. Character offsets computed for each match → rendered as coloured highlights in the UI
+6. Character offsets computed for each match → rendered as colour-coded highlights in the UI
 
 | Similarity | Verdict |
 |---|---|
@@ -220,6 +222,41 @@ npm run dev
 | ≥ 25% | Some similarity detected |
 | ≥ 10% | Minor similarity |
 | < 10% | Documents appear original |
+
+---
+
+## PDF Report
+
+Clicking **⬇ Download PDF** on any completed AI detection result generates a dark-themed A4 report entirely in the browser using [jsPDF](https://github.com/parallax/jsPDF) — no backend call, no upload. The report includes:
+
+- Document name, version label, and analysis timestamp
+- AI probability % with colour-coded gauge bar
+- AI% / Human% / Raw score stat boxes
+- Confidence meter with interpretation note
+- Score formula breakdown
+- Model details (model name, chunks analysed, word count, score variance)
+- Document preview (first 300 characters)
+- Per-chunk bar chart with colour-coded bars
+- Full chunk-by-chunk score table with classification labels
+- Page numbers and disclaimer footer
+
+Available for both live results and any result loaded from the version history sidebar.
+
+---
+
+## Model Metrics
+
+The `roberta-base-openai-detector` model was developed and released by OpenAI alongside GPT-2 1.5B.
+
+| Metric | Value | Notes |
+|---|---|---|
+| Accuracy | ~95% | On GPT-2 1.5B outputs vs WebText (ideal conditions) |
+| Test set | 10,000 samples | 5,000 human (WebText) + 5,000 GPT-2 generated |
+| Hardest case | Nucleus sampling | Most difficult to classify correctly |
+
+**Important limitations:**
+- The model was trained on GPT-2 outputs from 2019 — accuracy is lower on modern LLM outputs (GPT-4, Claude, Gemini)
+- Should be paired with human judgment, not used as sole evidence
 
 ---
 
@@ -252,5 +289,6 @@ Effectively **$0** for personal/academic use:
 - First AI detection after a cold start may take ~60s while the HuggingFace model loads. Subsequent runs are fast.
 - AI detection results stored in DynamoDB with a **7-day TTL**, then auto-deleted.
 - Plagiarism results are **not stored** — computed on demand and returned directly.
+- PDF reports are generated **entirely client-side** — jsPDF loaded from CDN on first use, no install needed.
 - Version history is scoped to the browser session via `localStorage`. Clearing browser data resets it.
-- PDF and DOCX text extraction is entirely **client-side** (PDF.js + mammoth.js loaded from CDN) — only plain text is sent to the backend, no file upload costs.
+- PDF and DOCX text extraction is entirely **client-side** (PDF.js + mammoth.js from CDN) — only plain text sent to backend.
